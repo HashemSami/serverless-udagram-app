@@ -15,6 +15,7 @@ export const handler: APIGatewayProxyHandler = async (event: APIGatewayProxyEven
     .query({
       TableName: imagesTable,
       IndexName: imageIdIndex,
+      // serch when the table id attribute == the path parameter
       KeyConditionExpression: "imageId = :imageId",
       ExpressionAttributeValues: {
         ":imageId": imageId
