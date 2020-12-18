@@ -42,6 +42,7 @@ provider:
     IMAGES_TABLE: Images-${self:provider.stage}
     IMAGE_ID_INDEX: ImageIdIndex
     IMAGES_S3_BUCKET: serverless-udagram-images-hashem-${self:provider.stage}
+    SIGNED_URL_EXPIRATION: 300
 
   # provide an IAM permissions to have access to the required resouces
   iamRoleStatements:
@@ -62,6 +63,12 @@ provider:
       Action:
         - dynamodb:Query
       Resource: arn:aws:dynamodb:${self:provider.region}:*:table/${self:provider.environment.IMAGES_TABLE}/index/${self:provider.environment.IMAGE_ID_INDEX}
+
+    - Effect: Allow
+      Action:
+        - s3:PutObject
+        - s3:GetObject
+      Resource: arn:aws:s3:::${self:provider.environment.IMAGES_S3_BUCKET}/*
 
 functions:
   GetGroups:
@@ -111,6 +118,9 @@ functions:
             # Schema that will be used to validate incoming requests
             schema:
               application/json: ${file(models/create-image-request.json)}
+
+  SendUploadNotifications:
+    handler: src/lambda/s3/sendNotifications.handler
 
 resources:
   Resources:
@@ -163,10 +173,12 @@ resources:
       # DependsOn: SNSTopicPolicy
       Properties:
         BucketName: ${self:provider.environment.IMAGES_S3_BUCKET}
-        # NotificationConfiguration:
-        # TopicConfigurations:
-        #   - Event: s3:ObjectCreated:Put
-        #     Topic: !Ref ImagesTopic
+        NotificationConfiguration:
+          LambdaConfigurations:
+            - Event: s3:ObjectCreated:*
+              # get the arn using the get attribute method of the cloud formation
+              Function: !GetAtt SendUploadNotificationsLambdaFunction.Arn
+              # Topic: !Ref ImagesTopic
         CorsConfiguration:
           CorsRules:
             - AllowedOrigins:
@@ -180,6 +192,16 @@ resources:
                 - DELETE
                 - HEAD
               MaxAge: 3000
+
+    # to aalow s3 bucket to send notification
+    SendUploadnotificationsPermission:
+      Type: AWS::Lambda::Permission
+      Properties:
+        FunctionName: !Ref SendUploadNotificationsLambdaFunction
+        Principal: s3.amazonaws.com
+        Action: lambda:InvokeFunction
+        SourceAccount: !Ref AWS::AccountId
+        SourceArn: arn:aws:s3:::${self:provider.environment.IMAGES_S3_BUCKET}
 
     BucketPolicy:
       Type: AWS::S3::BucketPolicy
