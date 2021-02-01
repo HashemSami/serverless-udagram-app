@@ -177,7 +177,11 @@ resources:
           - AttributeName: timestamp
             # range key is the sort key
             KeyType: RANGE
-
+        # this will enable the stream recording for this table
+        # to allow us to use other services to use the table items
+        # such as elasticSearch
+        StreamSpecification:
+          StreamViewType: NEW_IMAGE
         # this will create a secondary table that will have image Id as its primary key
         # and copy all other attributes to that table
         # to allow us to query a single image faster without scaning all data
